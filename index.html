@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HP-RTXC-5HX | סימולציה הנדסית — מערכת חימום מים תעשייתית Trane RTXC</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+<nav aria-label="ניווט בתצוגה הציבורית" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:12px;background:#142337;color:#fff;font:600 15px Arial;line-height:1.6">
+<a style="color:#fff" href="./index.html">המערכת — 5 מחליפי חום</a>
+<a style="color:#7dd3fc" href="./cutaway.html">חתך HP01 — תצוגה מקדימה</a>
+<a style="color:#fde68a" href="./review.html">מידע למהנדס ומגבלות המודל</a>
+<a style="color:#cbd5e1" href="https://github.com/kopcaptz/hp-rtxc-5hx">קוד המקור</a>
+</nav>
+  <!-- Single mandatory top banner (Section 12.3: Не размещать «ДЕМО» на каждом компоненте) -->
+  <div class="top-sim-banner">
+    הדגמה בלבד — קונספט לבדיקת מהנדס, לא תכנון לביצוע וללא חיבור למתקן אמיתי
+  </div>
+
+  <!-- Top Application Header & Controls -->
+  <header class="app-header">
+    <div class="header-brand">
+      <h1>מתקן חימום מים תעשייתי Trane RTXC 180 XE-HSE — 5 מודולי מחליפי חום (HX01–HX05)</h1>
+      <div class="subtitle">אב-טיפוס גיאומטרי וחישובי: RTXC180DHB01CBBARF0D0N0NFEDN (R513A, 12 מאווררי EC) | בקרת Symbio 800 + CP01</div>
+    </div>
+
+    <div class="toolbar-controls">
+      <!-- Time Controls -->
+      <div class="ctrl-group">
+        <button id="btn-play-pause" class="btn">⏸ השהה (Pause)</button>
+        <button id="btn-step" class="btn" title="צעד חישוב יחיד (1s)">⏭ צעד +1s</button>
+        <button id="btn-reset" class="btn" title="איפוס תרחיש">↺ איפוס</button>
+        <label for="speed-select">מהירות:</label>
+        <select id="speed-select">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1.0×</option>
+          <option value="2">2.0×</option>
+          <option value="5">5.0×</option>
+          <option value="10">10×</option>
+        </select>
+      </div>
+
+      <!-- Scenario Selector (16 Mandatory Scenarios) -->
+      <div class="ctrl-group">
+        <label for="scenario-select">תרחיש (16):</label>
+        <select id="scenario-select"></select>
+      </div>
+
+      <!-- Dataset Mode (DEMO vs SITE) -->
+      <div class="ctrl-group">
+        <label for="dataset-mode-select">מצב נתונים:</label>
+        <select id="dataset-mode-select">
+          <option value="DEMO" selected>דוגמה להדגמה (DEMO)</option>
+          <option value="SITE">נתוני אתר (SITE — חסרים נחסמים)</option>
+        </select>
+      </div>
+
+      <!-- Ambient Temperature & Summer Map Limit Check -->
+      <div class="ctrl-group">
+        <label for="ambient-temp-slider">טמפ׳ חוץ:</label>
+        <input id="ambient-temp-slider" type="range" min="-15" max="42" step="0.5" value="12" style="width:85px;" />
+        <span id="ambient-temp-val" style="min-width:48px;font-weight:700;">12.0 °C</span>
+        <label title="אכוף גבול 21°C מעמוד 48 במקום 30°C מעמוד 50" style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input id="strict-21c-check" type="checkbox" /> ≤21°C (עמ׳ 48)
+        </label>
+      </div>
+
+      <!-- Units Switcher -->
+      <div class="ctrl-group">
+        <label>יחידות:</label>
+        <select id="unit-flow" title="יחידת ספיקה">
+          <option value="L/s" selected>L/s</option>
+          <option value="m³/h">m³/h</option>
+          <option value="m³/s">m³/s</option>
+        </select>
+        <select id="unit-pressure" title="יחידת לחץ">
+          <option value="bar" selected>bar</option>
+          <option value="kPa">kPa</option>
+          <option value="Pa">Pa</option>
+        </select>
+        <select id="unit-temp" title="יחידת טמפרטורה">
+          <option value="°C" selected>°C</option>
+          <option value="K">K</option>
+        </select>
+        <select id="unit-power" title="יחידת הספק">
+          <option value="kW" selected>kW</option>
+          <option value="W">W</option>
+        </select>
+      </div>
+
+      <!-- JSON Export / Import & Secondary Modals -->
+      <div class="ctrl-group">
+        <button id="btn-export-json" class="btn">⬇ ייצוא JSON</button>
+        <button id="btn-import-json" class="btn">⬆ ייבוא JSON</button>
+        <input id="json-file-input" type="file" accept=".json" style="display:none;" />
+        <button class="btn" data-open-modal="modal-graphs">📈 גרפים וגז</button>
+        <button class="btn" data-open-modal="modal-water">💧 מים והזנה</button>
+        <button class="btn" data-open-modal="modal-service">📋 שירות ובדיקות (22/22)</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Technician At-a-Glance Strip (Section 12.3) -->
+  <section id="technician-glance-strip" class="glance-strip"></section>
+
+  <!-- Active Alarms & Diagnostics Bar -->
+  <section class="alarms-wrapper">
+    <div id="alarms-strip-container"></div>
+  </section>
+
+  <!-- Main Workspace: 3 Linked Views + Single Side Inspector Card -->
+  <main class="workspace-grid complex-layout-region">
+    <div class="viewport-column">
+      <div class="viewport-header-bar">
+        <div class="view-tabs">
+          <button id="tab-rooftop3d" class="btn active" data-view-mode="rooftop3d">🏢 1. מבט גג כללי (3D)</button>
+          <button id="btn-focus-modules" class="btn" title="מיקוד מצלמה על 5 מודולי מחליפי החום HX01–HX05">🔍 5 מודולי HX (3D)</button>
+          <button id="tab-cutaway3d" class="btn" data-view-mode="cutaway3d">⚙️ 2. רכיב מוגדל / חתך (3D)</button>
+          <button id="tab-pid" class="btn" data-view-mode="pid">📐 3. סכמת P&ID חיה לטכנאי</button>
+          <button id="btn-show-connections" class="btn">🔗 הצג חיבורים (Show Connections)</button>
+        </div>
+        <div id="scenario-description-bar" class="scenario-desc-bar">
+          <strong>עבודה תקינה (Нормальная работа):</strong> ספיקות, טמפרטורות ומאזן אנרגיה מיוצבים.
+        </div>
+      </div>
+
+      <!-- 3D / P&ID Viewport Frame -->
+      <div class="viewport-frame">
+        <div id="viewport-3d" class="viewport-canvas-host"></div>
+        <div id="viewport-pid" class="viewport-canvas-host" style="display:none;"></div>
+      </div>
+
+      <!-- Stream & Temperature Color Legend (Section 12.1) -->
+      <div class="stream-legend-bar">
+        <div class="legend-item"><span class="legend-dot" style="background:#e0f2fe;border:1px solid #38bdf8;"></span> זרימת אוויר (סלילי אידוי + 12 מאווררי EC)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#d946ef;"></span> קרר R513A (2 מעגלים + אקונומייזר BPHE; כחול בהפשקה)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#38bdf8;"></span> מים קרירים (&lt;34°C)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#14b8a6;"></span> מים חמימים (34–47°C)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> מים חמים (47–56°C)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> חמים מאוד / התראה (&gt;56°C)</div>
+        <div class="legend-item"><em>* חיצי זרימה נעים רק כאשר הספיקה המחושבת &gt; 0 ונעצרים בעצירת זרימה.</em></div>
+      </div>
+    </div>
+
+    <!-- Single Side Inspector Card (Section 12.2: Нажатие — одна боковая карточка) -->
+    <aside id="side-inspector-card" class="side-inspector-card"></aside>
+  </main>
+
+  <!-- Five Independent Consumers & Heat Exchange Modules Table (Section 12.3 & 3.2) -->
+  <section class="consumers-section complex-layout-region">
+    <div class="consumers-card">
+      <h3>מצב 5 מודולי מחליפי החום והצרכנים המשניים (צרכן 1 – צרכן 5 | הפרדה מפורשת בין טמפ׳ שוקולד, מי מעיל ומי RTXC)</h3>
+      <table class="consumers-table">
+        <thead>
+          <tr>
+            <th>צרכן / מודול</th>
+            <th>טמפ׳ שוקולד תהליכית</th>
+            <th>הזנת מים משנית למעיל</th>
+            <th>חזרת מים משנית</th>
+            <th>ספיקה ראשית</th>
+            <th>ספיקה משנית</th>
+            <th>הספק תרמי מועבר</th>
+            <th>שסתום CV (פקודה/פועל)</th>
+            <th>לחץ במעיל הצרכן (בגובה z_i)</th>
+            <th>משאבות משניות (1+1)</th>
+          </tr>
+        </thead>
+        <tbody id="consumers-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Hover Short Tooltip (Section 12.2: Наведение — короткое название) -->
+  <div id="hover-short-tooltip" class="hover-short-tooltip"></div>
+
+  <!-- Toast Notification -->
+  <div id="import-status-toast" class="toast-banner"></div>
+
+  <!-- MODAL 1: Trends, Energy Balance & Gas Comparison -->
+  <div id="modal-graphs" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>📈 גרפים בזמן אמת, מאזן אנרגיה, COP והשוואה מול דוד גז (סעיף 9.10)</h3>
+        <button class="btn" data-close-modal>✕ סגור</button>
+      </div>
+      <canvas id="history-trend-canvas" width="900" height="220" style="width:100%;border:1px solid #1e293b;border-radius:6px;margin-bottom:12px;"></canvas>
+      <div id="modal-econ-summary"></div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Water Chemistry & Atmospheric Break Makeup Unit -->
+  <div id="modal-water" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>💧 הכנת מים (WT01) ומכלנת הזנה עם מרווח אוויר אטמוספרי (MU01 — סעיף 7)</h3>
+        <button class="btn" data-close-modal>✕ סגור</button>
+      </div>
+      <div class="modal-grid-2">
+        <div class="modal-card">
+          <h4>יחידת הזנה עם מרווח אוויר (Atmospheric Break — MU01)</h4>
+          <p><strong>מרווח אוויר אטמוספרי:</strong> מונע העברת לחץ ישירה מרשת המים העירונית ומונע זרימה חוזרת.</p>
+          <p><strong>משאבת הזנה (Makeup Pump):</strong> עומד מרבי H_shutoff = 42 m (≈4.1 bar). מכיוון שמשאבת ההזנה עצמה עלולה ליצור לחץ מסוכן מעבר ל-2 bar במעיל, כל אחד מ-6 המעגלים מוגן על ידי שסתום פורק עצמאי (PSV00..PSV05) והפסקת משאבה בלחץ גבוה.</p>
+          <p><strong>6 קווי מילוי נפרדים:</strong> כל קו כולל וסת לחץ (PRV), שסתום סולנואיד סגור ברגיל (NC), שסתום אל-חוזר, מד נפח הזנה, והגבלת זמן/נפח מילוי.</p>
+          <p><strong>נקודת חיבור:</strong> ההזנה מחוברת לצנרת המים של כל מעגל — <em>לעולם לא לתוך תא הגז של מכל ההתפשטות</em>.</p>
+        </div>
+        <div class="modal-card">
+          <h4>איכות מים ומינון כימי (WT01 — דרישות Trane עמ׳ 13)</h4>
+          <p><strong>ערכי דוגמה:</strong> pH = 7.8 | מוליכות = 420 μS/cm | קשיות = 95 mg/L CaCO3 | כלורידים = 42 mg/L (&lt;125 mg/L).</p>
+          <p><strong>חסימות מינון (Interlocks):</strong> המינון נחסם אוטומטית בהיעדר זרימה מאושרת, במכל ריאגנט ריק, או באי-תקינות חיישן.</p>
+          <p><strong>הערה הנדסית (סעיף 7.2):</strong> מוליכות חשמלית אינה מדד אוניברסלי לריכוז מעכב קורוזיה — מותקנות נקודות דיגום ידניות לבדיקת מעבדה.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Service Information, RTXC Prototype Passport & 22 Acceptance Checks -->
+  <div id="modal-service" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>📋 מידע שירות, דרכון אב-טיפוס Trane RTXC 180 XE-HSE ובדיקות קבלה (22/22)</h3>
+        <button class="btn" data-close-modal>✕ סגור</button>
+      </div>
+      <div id="modal-service-content"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/ui/app.mjs"></script>
+</body>
+</html>
