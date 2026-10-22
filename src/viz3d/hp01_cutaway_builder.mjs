@@ -115,10 +115,10 @@ export function createContinuousHelicalRotorGeometry(options = {}) {
   const lastRingOffset = axialSegments * radialSegments;
   for (let it = 0; it < radialSegments; it++) {
     const nextIt = (it + 1) % radialSegments;
-    // Left cap (-X outward normal)
-    indices.push(leftCapCenterIdx, firstRingOffset + it, firstRingOffset + nextIt);
-    // Right cap (+X outward normal)
-    indices.push(rightCapCenterIdx, lastRingOffset + nextIt, lastRingOffset + it);
+    // Left cap at x = -halfL (-X outward normal; traverses rim edge nextIt -> it, opposite to side-wall a0 -> a1)
+    indices.push(leftCapCenterIdx, firstRingOffset + nextIt, firstRingOffset + it);
+    // Right cap at x = +halfL (+X outward normal; traverses rim edge it -> nextIt, opposite to side-wall b1 -> b0)
+    indices.push(rightCapCenterIdx, lastRingOffset + it, lastRingOffset + nextIt);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -733,7 +733,7 @@ export class HP01CutawayAssembly {
 
       // 4. Continuous Intermeshing Helical Twin-Screw Rotors (F04: Male 5-lobe + Female 6-flute continuous BufferGeometry, ASSUMED_FOR_DEMO)
       // Male center (upper-inner) and Female center (lower-front) inside rotorCasing:
-      // dy = -0.072 m, dz = +0.045 m -> center distance D_mf = 0.084906 m.
+      // dy = -0.075 m, dz = +0.046 m -> center distance D_mf = 0.087982952894 m (87.982952894 mm).
       // Tip sum R_tip_m (0.054) + R_tip_f (0.050) = 0.104 m > D_mf (19.1 mm pitch intermeshing).
       // Root+Tip sum max(0.054+0.028, 0.030+0.050) = 0.082 m < D_mf (>= 2.2 mm clearance at every slice, 0 solid interpenetration).
       const malePos = [cx + s * 0.12, cy + 0.038, cz + 0.014];

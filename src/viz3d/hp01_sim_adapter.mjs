@@ -72,19 +72,73 @@ export function evaluateStrictBooleanField(rawValue, options = {}) {
 }
 
 /**
- * Helper to validate a non-empty string or param({ value, status, ... }) record without ever calling String(undefined/null/object).
+ * Normalizes an explicit status string from a passport record without ever promoting missing/empty/unknown statuses.
  */
-function extractValidatedStringRecord(input, fallbackStatus = 'CONFIRMED_BY_DOC', missingTextHe = HP01_CUTAWAY_TEXT_HE.missingFallbacks.generic) {
+function normalizeExplicitRecordStatus(rawStatus) {
+  if (typeof rawStatus !== 'string') {
+    return { canonicalStatus: 'UNKNOWN_OR_MISSING', isExplicitMissing: false, rawStatus: null };
+  }
+  const trimmed = rawStatus.trim();
+  if (!trimmed) {
+    return { canonicalStatus: 'UNKNOWN_OR_MISSING', isExplicitMissing: false, rawStatus: null };
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower === 'missing_data' || lower === 'missing') {
+    return { canonicalStatus: 'UNKNOWN_OR_MISSING', isExplicitMissing: true, rawStatus: trimmed };
+  }
+  if (lower === 'unknown' || lower === 'unknown_or_missing') {
+    return { canonicalStatus: 'UNKNOWN_OR_MISSING', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  if (lower === 'confirmed_by_doc' || lower === 'confirmed') {
+    return { canonicalStatus: 'CONFIRMED_BY_DOC', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  if (lower === 'assumed_for_demo' || lower === 'assumed') {
+    return { canonicalStatus: 'ASSUMED_FOR_DEMO', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  if (lower === 'requires_clarification') {
+    return { canonicalStatus: 'REQUIRES_CLARIFICATION', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  if (lower === 'from_site') {
+    return { canonicalStatus: 'FROM_SITE', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  if (lower === 'confirmed_project_schema_id' || lower === 'project_schema_id') {
+    return { canonicalStatus: 'CONFIRMED_PROJECT_SCHEMA_ID', isExplicitMissing: false, rawStatus: trimmed };
+  }
+  return { canonicalStatus: 'UNKNOWN_OR_MISSING', isExplicitMissing: false, rawStatus: trimmed };
+}
+
+/**
+ * Helper to validate a non-empty string or param({ value, status, source, pageRef, ... }) record
+ * without ever calling String(undefined/null/object) and without promoting bare strings or missing statuses
+ * to CONFIRMED_BY_DOC / ASSUMED_FOR_DEMO (R2-01).
+ */
+function extractValidatedStringRecord(input, options = {}) {
+  const missingTextHe = options.missingTextHe || HP01_CUTAWAY_TEXT_HE.missingFallbacks.generic;
+  const allowCanonicalTagLiteral = options.allowCanonicalTagLiteral || null;
   const forbiddenLiterals = new Set(['undefined', 'null', '[object Object]', 'NaN']);
 
   if (typeof input === 'string') {
     const trimmed = input.trim();
     if (trimmed.length > 0 && !forbiddenLiterals.has(trimmed)) {
+      if (allowCanonicalTagLiteral && trimmed === allowCanonicalTagLiteral) {
+        return {
+          rawValue: trimmed,
+          isValid: true,
+          status: 'CONFIRMED_PROJECT_SCHEMA_ID',
+          passportDataStatus: 'confirmed_project_schema_id',
+          source: 'HP-RTXC-5HX_PROJECT_SCHEMA',
+          sourceRef: 'Stage 1 / Stage 2 canonical equipment schema ID',
+          conditions: null,
+          displayTextHe: trimmed
+        };
+      }
+      // Bare primitive string without explicit status/source is NEVER promoted to CONFIRMED_BY_DOC or ASSUMED_FOR_DEMO
       return {
         rawValue: trimmed,
-        isValid: true,
-        status: fallbackStatus,
+        isValid: false,
+        status: 'UNKNOWN_OR_MISSING',
         passportDataStatus: null,
+        source: null,
         sourceRef: null,
         conditions: null,
         displayTextHe: trimmed
@@ -95,6 +149,7 @@ function extractValidatedStringRecord(input, fallbackStatus = 'CONFIRMED_BY_DOC'
       isValid: false,
       status: 'UNKNOWN_OR_MISSING',
       passportDataStatus: null,
+      source: null,
       sourceRef: null,
       conditions: null,
       displayTextHe: missingTextHe
@@ -103,22 +158,34 @@ function extractValidatedStringRecord(input, fallbackStatus = 'CONFIRMED_BY_DOC'
 
   if (input && typeof input === 'object' && !Array.isArray(input)) {
     const val = input.value;
-    const rawStatus = typeof input.status === 'string' ? input.status : null;
-    if (typeof val === 'string' && rawStatus !== 'missing_data') {
+    const { canonicalStatus, isExplicitMissing, rawStatus } = normalizeExplicitRecordStatus(input.status);
+    if (isExplicitMissing) {
+      return {
+        rawValue: null,
+        isValid: false,
+        status: 'UNKNOWN_OR_MISSING',
+        passportDataStatus: rawStatus,
+        source: null,
+        sourceRef: null,
+        conditions: null,
+        displayTextHe: missingTextHe
+      };
+    }
+    if (typeof val === 'string') {
       const trimmed = val.trim();
       if (trimmed.length > 0 && !forbiddenLiterals.has(trimmed)) {
-        const normalizedStatus =
-          rawStatus === 'confirmed_by_doc' ? 'CONFIRMED_BY_DOC' :
-          rawStatus === 'assumed_for_demo' ? 'ASSUMED_FOR_DEMO' :
-          rawStatus === 'requires_clarification' ? 'REQUIRES_CLARIFICATION' :
-          rawStatus || fallbackStatus;
+        const rawSource = typeof input.source === 'string' && input.source.trim() ? input.source.trim() : null;
+        const rawPageRef = typeof input.pageRef === 'string' && input.pageRef.trim() ? input.pageRef.trim() : null;
+        const rawConditions = typeof input.conditions === 'string' && input.conditions.trim() ? input.conditions.trim() : null;
+        const isKnownStatus = canonicalStatus !== 'UNKNOWN_OR_MISSING';
         return {
           rawValue: trimmed,
-          isValid: true,
-          status: normalizedStatus,
+          isValid: isKnownStatus,
+          status: canonicalStatus,
           passportDataStatus: rawStatus,
-          sourceRef: typeof input.pageRef === 'string' && input.pageRef.trim() ? input.pageRef.trim() : null,
-          conditions: typeof input.conditions === 'string' && input.conditions.trim() ? input.conditions.trim() : null,
+          source: rawSource,
+          sourceRef: rawPageRef || rawSource || null,
+          conditions: rawConditions,
           displayTextHe: trimmed
         };
       }
@@ -130,78 +197,175 @@ function extractValidatedStringRecord(input, fallbackStatus = 'CONFIRMED_BY_DOC'
     isValid: false,
     status: 'UNKNOWN_OR_MISSING',
     passportDataStatus: null,
+    source: null,
     sourceRef: null,
     conditions: null,
     displayTextHe: missingTextHe
   };
 }
 
+function buildConsistentRoleNoteHe(fieldKind, rec) {
+  const notes = HP01_CUTAWAY_TEXT_HE.identityNotes;
+  if (rec.rawValue === null) {
+    if (fieldKind === 'equipmentTag') return notes.missingEquipmentIdHe;
+    if (fieldKind === 'shortModelName') return notes.missingShortModelNameHe;
+    return notes.missingConfigCodeHe;
+  }
+
+  if (fieldKind === 'equipmentTag') {
+    if (rec.status === 'CONFIRMED_PROJECT_SCHEMA_ID') {
+      return notes.equipmentSchemaRoleHe;
+    }
+    if (rec.status === 'CONFIRMED_BY_DOC') {
+      return rec.sourceRef
+        ? `מזהה רכיב מאומת בתיעוד (${rec.sourceRef} — CONFIRMED_BY_DOC; אינו מספר סידורי של היצרן)`
+        : 'מזהה רכיב מאומת בתיעוד (CONFIRMED_BY_DOC — אינו מספר סידורי של היצרן)';
+    }
+    if (rec.status === 'ASSUMED_FOR_DEMO') {
+      return notes.equipmentTagAssumedHe;
+    }
+    if (rec.status === 'REQUIRES_CLARIFICATION') {
+      return 'מזהה רכיב הדורש הבהרה הנדסית (REQUIRES_CLARIFICATION — אינו מספר סידורי של היצרן)';
+    }
+    if (rec.status === 'FROM_SITE') {
+      return 'מזהה רכיב מהאתר ללא אימות דרכון (FROM_SITE — אינו מספר סידורי של היצרן)';
+    }
+    return notes.equipmentTagUnverifiedHe;
+  }
+
+  if (fieldKind === 'shortModelName') {
+    if (rec.status === 'CONFIRMED_BY_DOC') {
+      const isCanonicalRtxc180 =
+        rec.rawValue === RTXC_PROTOTYPE_PASSPORT.shortModelName.value &&
+        rec.source === 'TRANE_IOM_0526' &&
+        rec.sourceRef === 'p. 16–17';
+      if (isCanonicalRtxc180) {
+        return notes.shortModelConfirmedHe;
+      }
+      return rec.sourceRef
+        ? `שם דגם מאומת בתיעוד (${rec.sourceRef} — CONFIRMED_BY_DOC)`
+        : notes.shortModelConfirmedGenericHe;
+    }
+    if (rec.status === 'ASSUMED_FOR_DEMO') {
+      return rec.sourceRef
+        ? `שם דגם להדגמה בלבד (${rec.sourceRef} — ASSUMED_FOR_DEMO)`
+        : notes.shortModelAssumedHe;
+    }
+    if (rec.status === 'REQUIRES_CLARIFICATION') {
+      return notes.shortModelClarificationHe;
+    }
+    if (rec.status === 'FROM_SITE') {
+      return notes.shortModelFromSiteHe;
+    }
+    return notes.shortModelUnverifiedHe;
+  }
+
+  // fieldKind === 'prototypeConfigCode'
+  if (rec.status === 'ASSUMED_FOR_DEMO') {
+    const isCanonical28Digit =
+      rec.rawValue === RTXC_PROTOTYPE_PASSPORT.modelDesignation.value &&
+      rec.source === 'TRANE_IOM_0526';
+    if (isCanonical28Digit) {
+      return notes.configCodeAssumedHe;
+    }
+    return notes.configCodeAssumedGenericHe;
+  }
+  if (rec.status === 'CONFIRMED_BY_DOC') {
+    return rec.sourceRef
+      ? `קוד תצורה מתועד (${rec.sourceRef} — אינו הזמנת מפעל מאומתת מהאתר — CONFIRMED_BY_DOC)`
+      : notes.configCodeConfirmedGenericHe;
+  }
+  if (rec.status === 'REQUIRES_CLARIFICATION') {
+    return notes.configCodeClarificationHe;
+  }
+  if (rec.status === 'FROM_SITE') {
+    return notes.configCodeFromSiteHe;
+  }
+  return notes.configCodeUnverifiedHe;
+}
+
 /**
- * F02: Resolves and strictly separates:
+ * F02 + R2-01: Resolves and strictly separates:
  *  1. `equipmentSchemaTag` ('HP01' — project schema equipment identifier, NOT a factory serial number)
- *  2. `shortModelName` (from `RTXC_PROTOTYPE_PASSPORT.shortModelName.value` — CONFIRMED_BY_DOC)
+ *  2. `shortModelName` (from `RTXC_PROTOTYPE_PASSPORT.shortModelName.value` — CONFIRMED_BY_DOC when backed by passport record)
  *  3. `prototypeConfigCode` (from `RTXC_PROTOTYPE_PASSPORT.modelDesignation.value` — ASSUMED_FOR_DEMO constructed 28-digit prototype code)
- * Never calls String(undefined) or reads non-existent `unitId` / `designation`.
+ * Guarantees 100% consistency between rawValue, status, provenance, roleNoteHe, displayTextHe, and displayHe.
+ * Never promotes bare strings or missing/unknown statuses to CONFIRMED_BY_DOC or ASSUMED_FOR_DEMO.
  */
 export function resolveHP01EquipmentIdentity(...args) {
-  const passportSource = args.length >= 1 ? args[0] : RTXC_PROTOTYPE_PASSPORT;
+  const rawPassportArg = args.length >= 1 ? args[0] : RTXC_PROTOTYPE_PASSPORT;
+  const passportSource =
+    rawPassportArg &&
+    typeof rawPassportArg === 'object' &&
+    !Array.isArray(rawPassportArg) &&
+    rawPassportArg.passport &&
+    typeof rawPassportArg.passport === 'object' &&
+    !('shortModelName' in rawPassportArg) &&
+    !('modelDesignation' in rawPassportArg)
+      ? rawPassportArg.passport
+      : rawPassportArg;
+
   const equipmentTagInput = args.length >= 2 ? args[1] : 'HP01';
-  const tagRec = extractValidatedStringRecord(
-    equipmentTagInput,
-    'PROJECT_SCHEMA_ID',
-    HP01_CUTAWAY_TEXT_HE.identityNotes.missingEquipmentIdHe
-  );
-  const tagDisplayHe = tagRec.isValid
-    ? `${tagRec.rawValue} (${HP01_CUTAWAY_TEXT_HE.identityNotes.equipmentSchemaRoleHe})`
-    : HP01_CUTAWAY_TEXT_HE.identityNotes.missingEquipmentIdHe;
+  const tagRec = extractValidatedStringRecord(equipmentTagInput, {
+    missingTextHe: HP01_CUTAWAY_TEXT_HE.identityNotes.missingEquipmentIdHe,
+    allowCanonicalTagLiteral: 'HP01'
+  });
+  const tagRoleNoteHe = buildConsistentRoleNoteHe('equipmentTag', tagRec);
+  const tagDisplayHe = tagRec.rawValue !== null ? `${tagRec.rawValue} (${tagRoleNoteHe})` : tagRoleNoteHe;
   const equipmentSchemaTag = {
     rawValue: tagRec.rawValue,
     isValid: tagRec.isValid,
-    status: tagRec.isValid ? 'CONFIRMED_PROJECT_SCHEMA_ID' : 'UNKNOWN_OR_MISSING',
-    provenance: tagRec.isValid ? 'CONFIRMED_PROJECT_SCHEMA_ID' : 'UNKNOWN_OR_MISSING',
+    status: tagRec.status,
+    provenance: tagRec.status,
+    passportDataStatus: tagRec.passportDataStatus,
+    source: tagRec.source,
+    sourceRef: tagRec.sourceRef,
     isFactorySerialNumber: false,
-    roleNoteHe: HP01_CUTAWAY_TEXT_HE.identityNotes.equipmentSchemaRoleHe,
+    roleNoteHe: tagRoleNoteHe,
     displayTextHe: tagDisplayHe,
     displayHe: tagDisplayHe
   };
 
   const shortNameRec = extractValidatedStringRecord(
     passportSource && typeof passportSource === 'object' ? passportSource.shortModelName : null,
-    'CONFIRMED_BY_DOC',
-    HP01_CUTAWAY_TEXT_HE.identityNotes.missingShortModelNameHe
+    {
+      missingTextHe: HP01_CUTAWAY_TEXT_HE.identityNotes.missingShortModelNameHe
+    }
   );
-  const shortDisplayHe = shortNameRec.isValid
-    ? `${shortNameRec.rawValue} (${HP01_CUTAWAY_TEXT_HE.identityNotes.shortModelConfirmedHe})`
-    : HP01_CUTAWAY_TEXT_HE.identityNotes.missingShortModelNameHe;
+  const shortRoleNoteHe = buildConsistentRoleNoteHe('shortModelName', shortNameRec);
+  const shortDisplayHe =
+    shortNameRec.rawValue !== null ? `${shortNameRec.rawValue} (${shortRoleNoteHe})` : shortRoleNoteHe;
   const shortModelName = {
     rawValue: shortNameRec.rawValue,
     isValid: shortNameRec.isValid,
-    status: shortNameRec.isValid ? shortNameRec.status : 'UNKNOWN_OR_MISSING',
-    provenance: shortNameRec.isValid ? shortNameRec.status : 'UNKNOWN_OR_MISSING',
+    status: shortNameRec.status,
+    provenance: shortNameRec.status,
     passportDataStatus: shortNameRec.passportDataStatus,
+    source: shortNameRec.source,
     sourceRef: shortNameRec.sourceRef,
-    roleNoteHe: HP01_CUTAWAY_TEXT_HE.identityNotes.shortModelConfirmedHe,
+    roleNoteHe: shortRoleNoteHe,
     displayTextHe: shortDisplayHe,
     displayHe: shortDisplayHe
   };
 
   const codeRec = extractValidatedStringRecord(
     passportSource && typeof passportSource === 'object' ? passportSource.modelDesignation : null,
-    'ASSUMED_FOR_DEMO',
-    HP01_CUTAWAY_TEXT_HE.identityNotes.missingConfigCodeHe
+    {
+      missingTextHe: HP01_CUTAWAY_TEXT_HE.identityNotes.missingConfigCodeHe
+    }
   );
-  const codeDisplayHe = codeRec.isValid
-    ? `${codeRec.rawValue} (${HP01_CUTAWAY_TEXT_HE.identityNotes.configCodeAssumedHe})`
-    : HP01_CUTAWAY_TEXT_HE.identityNotes.missingConfigCodeHe;
+  const codeRoleNoteHe = buildConsistentRoleNoteHe('prototypeConfigCode', codeRec);
+  const codeDisplayHe = codeRec.rawValue !== null ? `${codeRec.rawValue} (${codeRoleNoteHe})` : codeRoleNoteHe;
   const prototypeConfigCode = {
     rawValue: codeRec.rawValue,
     isValid: codeRec.isValid,
-    status: codeRec.isValid ? codeRec.status : 'UNKNOWN_OR_MISSING',
-    provenance: codeRec.isValid ? codeRec.status : 'UNKNOWN_OR_MISSING',
+    status: codeRec.status,
+    provenance: codeRec.status,
     isConfirmedFactoryOrder: false,
     passportDataStatus: codeRec.passportDataStatus,
+    source: codeRec.source,
     sourceRef: codeRec.sourceRef,
-    roleNoteHe: HP01_CUTAWAY_TEXT_HE.identityNotes.configCodeAssumedHe,
+    roleNoteHe: codeRoleNoteHe,
     displayTextHe: codeDisplayHe,
     displayHe: codeDisplayHe
   };
@@ -218,13 +382,48 @@ export function resolveHP01EquipmentIdentity(...args) {
 }
 
 /**
- * F01: Resolves R513A refrigerant charge with strict separation of confirmed total (304 kg, Table 2 p. 16 col. 180)
- * vs equal-split per-circuit estimate (2 × 152 kg, ASSUMED_FOR_DEMO), explicitly accounting for the frozen passport's classification.
+ * F01 + R2-01: Resolves R513A refrigerant charge with strict separation of confirmed total (304 kg, Table 2 p. 16 col. 180)
+ * vs equal-split per-circuit estimate (2 × 152 kg, ASSUMED_FOR_DEMO), reading actual `refrigerantChargeCkt1` and
+ * `refrigerantChargeCkt2` fields from the passport without any fake `'confirmed_by_doc'` fallback when absent.
  */
-export function resolveHP01RefrigerantChargeProvenance() {
+export function resolveHP01RefrigerantChargeProvenance(passportInput = RTXC_PROTOTYPE_PASSPORT) {
   const breakdown = HP01_GEOMETRY_CONSTANTS.massesKg.refrigerantChargeBreakdown;
-  const passportTotalVal = RTXC_PROTOTYPE_PASSPORT?.refrigerantChargeTotal?.value;
-  const passportPerCktStatus = RTXC_PROTOTYPE_PASSPORT?.refrigerantChargePerCircuitKg?.status || null;
+  const hasPassportObj = Boolean(passportInput && typeof passportInput === 'object' && !Array.isArray(passportInput));
+  const totalRec = hasPassportObj && Object.hasOwn(passportInput, 'refrigerantChargeTotal') ? passportInput.refrigerantChargeTotal : null;
+  const ckt1Rec = hasPassportObj && Object.hasOwn(passportInput, 'refrigerantChargeCkt1') ? passportInput.refrigerantChargeCkt1 : null;
+  const ckt2Rec = hasPassportObj && Object.hasOwn(passportInput, 'refrigerantChargeCkt2') ? passportInput.refrigerantChargeCkt2 : null;
+
+  const passportTotalVal = isFiniteNum(totalRec?.value) ? Number(totalRec.value) : null;
+  const ckt1Norm = normalizeExplicitRecordStatus(ckt1Rec?.status);
+  const ckt2Norm = normalizeExplicitRecordStatus(ckt2Rec?.status);
+  const bothCircuitsPresentAndKnown =
+    Boolean(ckt1Rec && ckt2Rec) &&
+    ckt1Norm.canonicalStatus !== 'UNKNOWN_OR_MISSING' &&
+    ckt2Norm.canonicalStatus !== 'UNKNOWN_OR_MISSING';
+
+  const actualPassportCircuitFields = [
+    {
+      key: 'refrigerantChargeCkt1',
+      existsInPassport: Boolean(ckt1Rec),
+      valueKg: isFiniteNum(ckt1Rec?.value) ? Number(ckt1Rec.value) : null,
+      rawStatus: ckt1Norm.rawStatus,
+      canonicalStatus: ckt1Rec ? ckt1Norm.canonicalStatus : 'UNKNOWN_OR_MISSING',
+      pageRef: typeof ckt1Rec?.pageRef === 'string' ? ckt1Rec.pageRef : null
+    },
+    {
+      key: 'refrigerantChargeCkt2',
+      existsInPassport: Boolean(ckt2Rec),
+      valueKg: isFiniteNum(ckt2Rec?.value) ? Number(ckt2Rec.value) : null,
+      rawStatus: ckt2Norm.rawStatus,
+      canonicalStatus: ckt2Rec ? ckt2Norm.canonicalStatus : 'UNKNOWN_OR_MISSING',
+      pageRef: typeof ckt2Rec?.pageRef === 'string' ? ckt2Rec.pageRef : null
+    }
+  ];
+
+  const frozenFileStatus =
+    bothCircuitsPresentAndKnown && ckt1Norm.rawStatus === ckt2Norm.rawStatus
+      ? ckt1Norm.rawStatus
+      : 'UNKNOWN_OR_MISSING';
 
   return {
     refrigerantType: breakdown.refrigerantType,
@@ -255,10 +454,27 @@ export function resolveHP01RefrigerantChargeProvenance() {
     },
     frozenPrototypeClassificationNote: {
       frozenFilePath: 'src/equipment/rtxc_prototype.mjs',
-      frozenFileField: 'refrigerantChargePerCircuitKg',
-      frozenFileStatus: passportPerCktStatus || 'confirmed_by_doc',
+      frozenFileField: 'refrigerantChargeCkt1',
+      frozenFileFields: ['refrigerantChargeCkt1', 'refrigerantChargeCkt2'],
+      actualPassportCircuitFields,
+      frozenFileStatus,
+      frozenFileOriginalClassification: frozenFileStatus,
+      frozenFileValuesKg: {
+        refrigerantChargeCkt1: actualPassportCircuitFields[0].valueKg,
+        refrigerantChargeCkt2: actualPassportCircuitFields[1].valueKg
+      },
       visualLayerCorrectedClassification: 'ASSUMED_FOR_DEMO',
-      explanationHe: HP01_CUTAWAY_TEXT_HE.refrigerantChargeNotes.frozenPrototypeClassificationNoteHe
+      // P3-01: the explanation follows the statuses/values actually passed in. The fixed confirmed_by_doc note is used
+      // only when both records really are confirmed_by_doc with the equal-split values it describes.
+      explanationHe: !bothCircuitsPresentAndKnown
+        ? HP01_CUTAWAY_TEXT_HE.refrigerantChargeNotes.frozenPrototypeMissingNoteHe
+        : actualPassportCircuitFields.every(
+              (f) => f.canonicalStatus === 'CONFIRMED_BY_DOC' && f.valueKg === breakdown.ckt1EstimatedKg
+            )
+          ? HP01_CUTAWAY_TEXT_HE.refrigerantChargeNotes.frozenPrototypeClassificationNoteHe
+          : `בדרכון שהועבר: ${actualPassportCircuitFields
+              .map((f) => `${f.key}=${f.valueKg === null ? '—' : f.valueKg} (${f.rawStatus})`)
+              .join(', ')}; בטבלה 2 עמ׳ 16 מופיע רק הסכום הכולל ${breakdown.totalKg} ק״ג, לכן בשכבת החתך מוצגת חלוקה שווה למעגלים כ-ASSUMED_FOR_DEMO`
     }
   };
 }

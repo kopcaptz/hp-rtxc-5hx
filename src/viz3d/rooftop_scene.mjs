@@ -6,12 +6,33 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../../vendor/three/addons/controls/OrbitControls.js';
 import { COMPONENT_REGISTRY, CONNECTION_REGISTRY, getConnectedObjects } from '../topology/registry.mjs';
+import { HP01CutawayController } from './hp01_cutaway_controller.mjs';
+import { HP01AnimationClock } from './hp01_process_animation.mjs';
 
 export class Rooftop3DScene {
   constructor(containerEl, callbacks = {}) {
     this.container = containerEl;
     this.onSelectComponent = callbacks.onSelectComponent || (() => {});
     this.onHoverComponent = callbacks.onHoverComponent || (() => {});
+    this.onSelectHP01SubNode = callbacks.onSelectHP01SubNode || (() => {});
+    this.onHoverHP01SubNode = callbacks.onHoverHP01SubNode || (() => {});
+
+    // Package C lifecycle counters: incremented only where the real work happens
+    this.lifecycle = {
+      rooftopUpdateTicks: 0,
+      cutawayUpdateTicks: 0,
+      renderCalls: 0,
+      legacyCutawayRebuilds: 0,
+      legacyDisposedGeometries: 0,
+      legacyDisposedMaterials: 0,
+      legacyDisposedTextures: 0,
+      domListenerRegistrations: 0,
+      hp01AnimFrames: 0,
+      hp01AnimZeroDtFrames: 0,
+      hp01AnimMissingVm: 0,
+      hp01VisibilityChanges: 0
+    };
+    this.hp01AnimClock = new HP01AnimationClock(); // time base of the HP01 animation (gap/visibility detection only, never accumulated)
 
     this.mode = 'rooftop3d'; // 'rooftop3d' | 'cutaway3d'
     this.selectedId = 'HP01';
@@ -91,6 +112,14 @@ export class Rooftop3DScene {
 
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
+
+    // Rooftop camera/control limits, restored when leaving the HP01 cutaway (close-up presets need a closer range)
+    this.rooftopControlLimits = {
+      minDistance: this.controls.minDistance,
+      maxDistance: this.controls.maxDistance,
+      maxPolarAngle: this.controls.maxPolarAngle,
+      near: this.camera.near
+    };
   }
 
   // Helper to register interactive component group
@@ -745,14 +774,92 @@ export class Rooftop3DScene {
 
   buildCutawayStage() {
     // Interactive 3D Cutaway / Close-Up Stage (Выбранный компонент крупно или в разрезе)
-    this.cutawayGroup = new THREE.Group();
-    this.cutawayRoot.add(this.cutawayGroup);
+    // Package C: HP01 uses the accepted assembly (built lazily once); other components keep their temporary close-ups.
+    this.legacyNonHp01CutawayGroup = new THREE.Group();
+    this.legacyNonHp01CutawayGroup.name = 'LEGACY_NON_HP01_CUTAWAY';
+    this.cutawayGroup = this.legacyNonHp01CutawayGroup; // existing name kept for the legacy builders below
+    this.cutawayRoot.add(this.legacyNonHp01CutawayGroup);
+
+    this.hp01Controller = new HP01CutawayController(this);
+    this.hp01CutawayContainer = this.hp01Controller.container;
+    this.hp01CutawayContainer.visible = false;
+    this.cutawayRoot.add(this.hp01CutawayContainer);
+  }
+
+  // Frees only the temporary geometry/material/texture created by rebuildCutawayForComponent (never HP01/rooftop)
+  disposeLegacyCutaway() {
+    const geos = new Set();
+    const mats = new Set();
+    this.legacyNonHp01CutawayGroup.traverse((o) => {
+      if (o.isMesh) {
+        if (o.geometry) geos.add(o.geometry);
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m) mats.add(m);
+      }
+    });
+    for (const g of geos) { g.dispose(); this.lifecycle.legacyDisposedGeometries += 1; }
+    for (const m of mats) {
+      if (m.map) { m.map.dispose(); this.lifecycle.legacyDisposedTextures += 1; }
+      m.dispose();
+      this.lifecycle.legacyDisposedMaterials += 1;
+    }
+    while (this.legacyNonHp01CutawayGroup.children.length > 0) {
+      this.legacyNonHp01CutawayGroup.remove(this.legacyNonHp01CutawayGroup.children[0]);
+    }
+  }
+
+  isHP01CutawayActive() {
+    return this.mode === 'cutaway3d' && (this.selectedId || 'HP01') === 'HP01';
+  }
+
+  _applyCutawayTarget(compId, sim) {
+    if ((compId || 'HP01') === 'HP01') {
+      this.disposeLegacyCutaway();
+      this.legacyNonHp01CutawayGroup.visible = false;
+      this.controls.minDistance = 0.35;
+      this.controls.maxDistance = 30;
+      this.controls.maxPolarAngle = Math.PI - 0.05;
+      this.camera.near = 0.05;
+      this.camera.updateProjectionMatrix();
+      this.hp01Controller.enter();
+    } else {
+      this.hp01Controller.leave();
+      this._restoreRooftopControlLimits();
+      this.legacyNonHp01CutawayGroup.visible = true;
+      this.rebuildCutawayForComponent(compId, sim);
+      this.camera.position.set(0, 3.6, 7.2);
+      this.controls.target.set(0, 1.7, 0);
+      this.controls.update();
+    }
+  }
+
+  _restoreRooftopControlLimits() {
+    const l = this.rooftopControlLimits;
+    this.controls.minDistance = l.minDistance;
+    this.controls.maxDistance = l.maxDistance;
+    this.controls.maxPolarAngle = l.maxPolarAngle;
+    if (this.camera.near !== l.near) {
+      this.camera.near = l.near;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  getSceneLifecycleTelemetry() {
+    const mem = this.renderer.info.memory;
+    return {
+      mode: this.mode,
+      ...this.lifecycle,
+      rendererMemory: { geometries: mem.geometries, textures: mem.textures },
+      rendererPrograms: this.renderer.info.programs ? this.renderer.info.programs.length : null,
+      rooftopVisible: this.rooftopRoot.visible,
+      cutawayVisible: this.cutawayRoot.visible,
+      legacyChildCount: this.legacyNonHp01CutawayGroup.children.length,
+      hp01: this.hp01Controller.getTelemetry()
+    };
   }
 
   rebuildCutawayForComponent(compId, sim) {
-    while (this.cutawayGroup.children.length > 0) {
-      this.cutawayGroup.remove(this.cutawayGroup.children[0]);
-    }
+    this.disposeLegacyCutaway();
+    this.lifecycle.legacyCutawayRebuilds += 1;
     const s = sim.state;
 
     // Platform
@@ -866,7 +973,7 @@ export class Rooftop3DScene {
       waterZone.position.y = 0.95;
       this.cutawayGroup.add(gasZone, waterZone);
     } else {
-      // Default / HP01 RTXC Cutaway showing Twin-Screw Rotor + Falling-Film Tube Bundle + BPHE Economizer + V-Coils
+      // Default close-up for other components without a dedicated cutaway (HP01 itself now uses the accepted assembly)
       const evapShell = new THREE.Mesh(
         new THREE.CylinderGeometry(0.95, 0.95, 4.8, 28, 1, false, 0, Math.PI),
         new THREE.MeshStandardMaterial({ color: 0x334155, side: THREE.DoubleSide, metalness: 0.7 })
@@ -920,10 +1027,11 @@ export class Rooftop3DScene {
     if (mode === 'cutaway3d') {
       this.rooftopRoot.visible = false;
       this.cutawayRoot.visible = true;
-      this.rebuildCutawayForComponent(this.selectedId || 'HP01', sim);
-      this.camera.position.set(0, 3.6, 7.2);
-      this.controls.target.set(0, 1.7, 0);
+      this._applyCutawayTarget(this.selectedId || 'HP01', sim);
     } else {
+      this.hp01Controller.leave();
+      this.disposeLegacyCutaway(); // temporary close-ups are not kept while the cutaway is hidden
+      this._restoreRooftopControlLimits();
       this.rooftopRoot.visible = true;
       this.cutawayRoot.visible = false;
       this.camera.position.set(17.5, 13.5, 19.5);
@@ -933,15 +1041,19 @@ export class Rooftop3DScene {
   }
 
   setSelection(compId, showConnectionsOnly = this.showConnectionsOnly, sim = null) {
+    const prev = this.selectedId;
     this.selectedId = compId;
     this.showConnectionsOnly = showConnectionsOnly;
     if (this.mode === 'cutaway3d' && sim) {
-      this.rebuildCutawayForComponent(compId, sim);
+      // HP01 stays the same built assembly; a different component swaps to its temporary close-up
+      if (!(compId === 'HP01' && prev === 'HP01')) this._applyCutawayTarget(compId, sim);
     }
   }
 
   focusOnModulesBank() {
     this.mode = 'rooftop3d';
+    this.hp01Controller.leave();
+    this._restoreRooftopControlLimits();
     this.rooftopRoot.visible = true;
     this.cutawayRoot.visible = false;
     this.camera.position.set(-6.2, 6.8, 10.8);
@@ -952,11 +1064,15 @@ export class Rooftop3DScene {
   bindEvents() {
     const dom = this.renderer.domElement;
 
-    const getIntersectedCompId = (clientX, clientY) => {
-      if (this.mode !== 'rooftop3d') return null;
+    const setPointer = (clientX, clientY) => {
       const rect = dom.getBoundingClientRect();
       this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    };
+
+    const getIntersectedCompId = (clientX, clientY) => {
+      if (this.mode !== 'rooftop3d') return null;
+      setPointer(clientX, clientY);
       this.raycaster.setFromCamera(this.pointer, this.camera);
       const hits = this.raycaster.intersectObjects(this.pickableMeshes, false);
       if (hits.length > 0) {
@@ -965,7 +1081,28 @@ export class Rooftop3DScene {
       return null;
     };
 
-    dom.addEventListener('pointermove', (e) => {
+    // HP01 cutaway: pick on the assembly's own pickable meshes only
+    const getIntersectedSubNodeId = (clientX, clientY) => {
+      if (!this.isHP01CutawayActive()) return null;
+      setPointer(clientX, clientY);
+      return this.hp01Controller.pickSubNode(this.pointer, this.camera, this.raycaster);
+    };
+
+    const listen = (target, type, fn) => {
+      target.addEventListener(type, fn);
+      this.lifecycle.domListenerRegistrations += 1;
+    };
+
+    listen(dom, 'pointermove', (e) => {
+      if (this.isHP01CutawayActive()) {
+        const sub = getIntersectedSubNodeId(e.clientX, e.clientY);
+        if (sub !== this.hoveredSubNodeId) {
+          this.hoveredSubNodeId = sub;
+          dom.style.cursor = sub ? 'pointer' : 'grab';
+          this.onHoverHP01SubNode(sub, e);
+        }
+        return;
+      }
       const id = getIntersectedCompId(e.clientX, e.clientY);
       if (id !== this.hoveredId) {
         this.hoveredId = id;
@@ -974,14 +1111,41 @@ export class Rooftop3DScene {
       }
     });
 
-    let downPos = { x: 0, y: 0 };
-    dom.addEventListener('pointerdown', (e) => {
-      downPos = { x: e.clientX, y: e.clientY };
-    });
+    // Click vs drag is decided over the whole gesture, per pointerId: once a pointer has moved >= CLICK_SLOP_PX
+    // from its press point (or a second pointer joined), the gesture stays a drag even if it returns to the start.
+    const CLICK_SLOP_PX = 6;
+    const gestures = new Map();
+    const trackMove = (e) => {
+      const g = gestures.get(e.pointerId);
+      if (!g) return;
+      g.maxDist = Math.max(g.maxDist, Math.hypot(e.clientX - g.x, e.clientY - g.y));
+      if (g.maxDist >= CLICK_SLOP_PX) g.didDrag = true;
+    };
+    const endGesture = (e) => { gestures.delete(e.pointerId); };
 
-    dom.addEventListener('pointerup', (e) => {
-      const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
-      if (dist < 6) {
+    listen(dom, 'pointerdown', (e) => {
+      // A primary press starts a fresh gesture set: stale entries (release lost outside the window) are dropped
+      if (e.isPrimary !== false) gestures.clear();
+      gestures.delete(e.pointerId);
+      const multi = gestures.size > 0;
+      if (multi) for (const g of gestures.values()) g.didDrag = true;
+      gestures.set(e.pointerId, { x: e.clientX, y: e.clientY, maxDist: 0, didDrag: multi });
+    });
+    listen(dom, 'pointermove', trackMove);
+    listen(dom, 'pointercancel', endGesture);
+    // Leaving the canvas mid-press is never a click (the pointer may be released elsewhere)
+    listen(dom, 'pointerleave', (e) => { const g = gestures.get(e.pointerId); if (g) g.didDrag = true; });
+
+    listen(dom, 'pointerup', (e) => {
+      trackMove(e);
+      const g = gestures.get(e.pointerId);
+      endGesture(e);
+      if (g && !g.didDrag && Math.hypot(e.clientX - g.x, e.clientY - g.y) < CLICK_SLOP_PX) {
+        if (this.isHP01CutawayActive()) {
+          const sub = getIntersectedSubNodeId(e.clientX, e.clientY);
+          if (sub) this.onSelectHP01SubNode(sub);
+          return;
+        }
         const id = getIntersectedCompId(e.clientX, e.clientY);
         if (id) {
           this.onSelectComponent(id);
@@ -989,7 +1153,23 @@ export class Rooftop3DScene {
       }
     });
 
-    window.addEventListener('resize', () => this.resize());
+    listen(window, 'resize', () => this.resize());
+    // D-R1-02: any visibility change resets the animation time base (also when no frame ran while hidden)
+    if (typeof document !== 'undefined') listen(document, 'visibilitychange', () => { this.hp01AnimClock.onVisibilityChange(); this.lifecycle.hp01VisibilityChanges += 1; });
+  }
+
+  /**
+   * PACKAGE D: dtAnim = bounded wall dt (never × sim.timeMultiplier); 0 on global pause, Visual Freeze, hidden document,
+   * the first frame after (re)entering the cutaway and after a frame gap > 0.5 s (no catch-up). A missing VM is passed on
+   * as null so the animator fails closed (no stale particles, no motion).
+   */
+  _updateHP01Animation(sim, dtReal, vm) {
+    const hidden = typeof document !== 'undefined' && document.hidden === true;
+    const dtAnim = this.hp01AnimClock.frame({ nowMs: performance.now(), dtReal, hidden, globalPaused: Boolean(sim.paused), visualFreeze: Boolean(this.hp01Controller.state.visualFreeze) });
+    this.lifecycle.hp01AnimFrames += 1;
+    if (dtAnim === 0) this.lifecycle.hp01AnimZeroDtFrames += 1;
+    if (!vm) this.lifecycle.hp01AnimMissingVm += 1;
+    this.hp01Controller.updateAnimation(vm, dtAnim, sim);
   }
 
   resize() {
@@ -1001,8 +1181,20 @@ export class Rooftop3DScene {
     this.renderer.setSize(w, h);
   }
 
-  updateAndRender(sim, dtReal_s = 0.016) {
+  updateAndRender(sim, dtReal_s = 0.016, frame = {}) {
     if (!sim) return;
+    if (this.mode === 'cutaway3d') {
+      // Hidden rooftop is not traversed or animated; only the HP01 assembly is animated (Package D), legacy close-ups stay static
+      this.lifecycle.cutawayUpdateTicks += 1;
+      if (this.isHP01CutawayActive()) this._updateHP01Animation(sim, dtReal_s, frame.hp01VM || null);
+      else if (this.hp01AnimClock.lastMs !== null) this.hp01AnimClock.reset();
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+      this.lifecycle.renderCalls += 1;
+      return;
+    }
+    this.lifecycle.rooftopUpdateTicks += 1;
+    if (this.hp01AnimClock.lastMs !== null) this.hp01AnimClock.reset(); // hidden cutaway: no background update; re-entry starts with dtAnim = 0
     const s = sim.state;
     const simRunning = !sim.paused;
 
@@ -1088,5 +1280,6 @@ export class Rooftop3DScene {
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    this.lifecycle.renderCalls += 1;
   }
 }

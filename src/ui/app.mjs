@@ -32,6 +32,11 @@ import { SCENARIOS, applyScenario, EVENT_REACTION_MATRIX } from '../scenarios/sc
 import { UI_TEXT_HE, PUMP_STATE_LABELS_HE, STARTUP_STAGE_LABELS_HE } from '../i18n/he_ru.mjs';
 import { LivePIDView } from './p_and_id_view.mjs';
 import { Rooftop3DScene } from '../viz3d/rooftop_scene.mjs';
+import { HP01_SUBNODES, HP01_CAMERA_PRESETS } from '../viz3d/hp01_cutaway_meta.mjs';
+import { buildHP01CutawayViewModel } from '../viz3d/hp01_sim_adapter.mjs';
+import { renderHP01CutawayCardHtml } from './hp01_cutaway_panel.mjs';
+import { describeHP01AnimationStatus, HP01_ANIMATION_TEXT_HE } from '../viz3d/hp01_process_animation.mjs';
+import HP01_PURPOSE_DICTIONARY from '../i18n/hp01_purpose_he.json' with { type: 'json' };
 
 class PlantSimulationApp {
   constructor() {
@@ -215,6 +220,28 @@ class PlantSimulationApp {
       e.target.value = '';
     });
 
+    // Package C: HP01 cutaway controls — bound once; every control goes through the single controller state
+    const hp01NodeSel = document.getElementById('hp01-node-select');
+    if (hp01NodeSel) {
+      hp01NodeSel.innerHTML =
+        '<option value="">HP01 — סקירת יחידה (כל 25 הצמתים)</option>' +
+        Object.values(HP01_SUBNODES).map((n) => `<option value="${n.id}">${n.id} — ${n.shortNameHe}</option>`).join('');
+      hp01NodeSel.addEventListener('change', (e) => this.hp01Controller?.selectSubNode(e.target.value || null, { reason: 'list' }));
+    }
+    const hp01CamSel = document.getElementById('hp01-camera-select');
+    if (hp01CamSel) {
+      hp01CamSel.innerHTML = Object.values(HP01_CAMERA_PRESETS).map((p) => `<option value="${p.id}">${p.labelHe}</option>`).join('');
+      hp01CamSel.addEventListener('change', (e) => this.hp01Controller?.setCameraPreset(e.target.value));
+    }
+    document.getElementById('hp01-filter-select')?.addEventListener('change', (e) => this.hp01Controller?.setCircuitFilter(e.target.value));
+    document.getElementById('hp01-casing-select')?.addEventListener('change', (e) => this.hp01Controller?.setCasingMode(e.target.value));
+    document.getElementById('hp01-btn-overview')?.addEventListener('click', () => this.hp01Controller?.resetToOverview());
+    document.getElementById('hp01-btn-roof')?.addEventListener('click', () => this.switchViewMode('rooftop3d'));
+    // Package D: Visual Freeze holds only the picture still (the model keeps calculating); native button = keyboard access
+    document.getElementById('hp01-btn-freeze')?.addEventListener('click', () => {
+      this.hp01Controller?.setVisualFreeze(!this.hp01Controller.state.visualFreeze, 'freeze');
+    });
+
     // Modal triggers
     document.querySelectorAll('[data-open-modal]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -317,16 +344,46 @@ class PlantSimulationApp {
         this.pidView.setSelection(compId, this.showConnectionsOnly);
         this.pidView.render(this.sim);
       }
+      this.syncHP01Toolbar();
       this.renderInspectorCard();
     };
 
     const viewport3d = document.getElementById('viewport-3d');
     const viewportPid = document.getElementById('viewport-pid');
 
+    const handleHoverSubNode = (subId, ev) => {
+      if (!hoverTip) return;
+      if (!subId) {
+        hoverTip.classList.remove('visible');
+        return;
+      }
+      hoverTip.textContent = `${subId} — ${HP01_SUBNODES[subId]?.shortNameHe || ''}`;
+      hoverTip.classList.add('visible');
+      if (ev && typeof ev.clientX === 'number') {
+        hoverTip.style.left = `${Math.min(window.innerWidth - 220, ev.clientX + 14)}px`;
+        hoverTip.style.top = `${Math.max(12, ev.clientY - 28)}px`;
+      }
+    };
+
     if (viewport3d) {
       this.scene3d = new Rooftop3DScene(viewport3d, {
         onSelectComponent: handleSelect,
-        onHoverComponent: handleHover
+        onHoverComponent: handleHover,
+        onSelectHP01SubNode: (subId) => this.hp01Controller?.selectSubNode(subId, { reason: 'canvas' }),
+        onHoverHP01SubNode: handleHoverSubNode
+      });
+      this.hp01Controller = this.scene3d.hp01Controller;
+      // prefers-reduced-motion: calm initial state (frozen picture); the button can still start the motion
+      if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.hp01Controller.setVisualFreeze(true, 'reduced-motion');
+      }
+      this.hp01Controller.onChange((state, reason) => {
+        this.syncHP01Toolbar();
+        this.renderInspectorCard();
+        // Narrow screens: bring the focus strip, model and start of the card into view after a selection
+        if ((reason === 'list' || reason === 'canvas' || reason === 'preset') && window.innerWidth <= 1100) {
+          document.getElementById('hp01-cutaway-toolbar')?.scrollIntoView({ block: 'start', behavior: 'instant' });
+        }
       });
     }
 
@@ -357,6 +414,102 @@ class PlantSimulationApp {
       this.scene3d?. resize();
       this.scene3d?.setMode(mode, this.sim);
     }
+    this.syncHP01Toolbar();
+    this.renderInspectorCard();
+  }
+
+  isHP01CutawayView() {
+    return this.viewMode === 'cutaway3d' && this.selectedComponentId === 'HP01';
+  }
+
+  // Toolbar, focus strip and legend follow the single controller state
+  syncHP01Toolbar() {
+    const bar = document.getElementById('hp01-cutaway-toolbar');
+    const legend = document.getElementById('stream-legend-bar');
+    const active = this.isHP01CutawayView();
+    if (bar) bar.hidden = !active;
+    if (legend) legend.style.display = active ? 'none' : '';
+    if (!active || !this.hp01Controller) return;
+    const st = this.hp01Controller.state;
+    const nodeSel = document.getElementById('hp01-node-select');
+    if (nodeSel) nodeSel.value = st.selectedSubNodeId || '';
+    const camSel = document.getElementById('hp01-camera-select');
+    if (camSel) camSel.value = st.cameraPreset;
+    const fSel = document.getElementById('hp01-filter-select');
+    if (fSel) fSel.value = st.circuitFilter;
+    const cSel = document.getElementById('hp01-casing-select');
+    if (cSel) cSel.value = st.casingMode;
+    const freezeBtn = document.getElementById('hp01-btn-freeze');
+    if (freezeBtn) {
+      freezeBtn.setAttribute('aria-pressed', st.visualFreeze ? 'true' : 'false');
+      freezeBtn.textContent = st.visualFreeze ? HP01_ANIMATION_TEXT_HE.freezeOff : HP01_ANIMATION_TEXT_HE.freezeOn;
+    }
+    const focus = document.getElementById('hp01-focus-strip');
+    if (focus) {
+      const n = st.selectedSubNodeId ? HP01_SUBNODES[st.selectedSubNodeId] : null;
+      focus.textContent = n ? `מיקוד: ${n.id} — ${n.shortNameHe}` : 'מיקוד: HP01 — סקירה';
+    }
+  }
+
+  /**
+   * PACKAGE D: one fresh VM per frame while the HP01 cutaway is shown; the animator, the status strip and the card
+   * rendered during the same frame read this one snapshot (no second "truth"). Outside the frame (button handlers,
+   * "Step", imports) the card builds a fresh VM. Visual Freeze is not passed to the adapter: its visualPaused option
+   * zeroes the conditional speeds and would hide UNKNOWN / UNCONFIRMED states; freeze is dtAnim = 0 in the scene.
+   */
+  buildHP01FrameViewModel() {
+    if (!this.isHP01CutawayView() || !this.hp01Controller?.animationEnabled) {
+      this.hp01FrameVM = null;
+      return null;
+    }
+    const vm = buildHP01CutawayViewModel(this.sim, this.unitPrefs);
+    this.hp01FrameVM = { vm, sim: this.sim };
+    return vm;
+  }
+
+  getHP01ViewModelForCard() {
+    const c = this.hp01FrameVM;
+    if (this.hp01InFrame && c && c.sim === this.sim) return c.vm;
+    return buildHP01CutawayViewModel(this.sim, this.unitPrefs);
+  }
+
+  getHP01AnimationStatus(vm) {
+    return describeHP01AnimationStatus(vm, {
+      globalPaused: Boolean(this.sim.paused),
+      visualFreeze: Boolean(this.hp01Controller?.state.visualFreeze),
+      enabled: this.hp01Controller?.animationEnabled !== false
+    });
+  }
+
+  // Status strip of the toolbar follows every frame (text only rewritten on change); the card re-renders on a change
+  syncHP01AnimationStatus(vm) {
+    const el = document.getElementById('hp01-anim-status');
+    if (!el || !vm || !this.isHP01CutawayView()) return;
+    const st = this.getHP01AnimationStatus(vm);
+    if (st.textHe === this.hp01LastAnimStatusText) return;
+    this.hp01LastAnimStatusText = st.textHe;
+    el.textContent = st.textHe;
+    el.dataset.pause = st.pause;
+    el.dataset.rotors = st.rotors;
+    el.dataset.fans = st.fans;
+    el.dataset.water = st.water;
+    el.dataset.refrigerant = st.refrigerant;
+    this.renderInspectorCard();
+  }
+
+  renderHP01CutawayCard(cardEl) {
+    const vm = this.getHP01ViewModelForCard();
+    this.hp01CardRenderCount = (this.hp01CardRenderCount || 0) + 1;
+    cardEl.innerHTML = renderHP01CutawayCardHtml({
+      vm,
+      animStatus: this.getHP01AnimationStatus(vm),
+      state: this.hp01Controller.state,
+      purposeDict: HP01_PURPOSE_DICTIONARY,
+      passport: RTXC_PROTOTYPE_PASSPORT,
+      hp01Registry: COMPONENT_REGISTRY.HP01
+    });
+    cardEl.querySelector('[data-hp01-action="overview"]')?.addEventListener('click', () => this.hp01Controller.resetToOverview());
+    cardEl.querySelector('[data-hp01-action="roof"]')?.addEventListener('click', () => this.switchViewMode('rooftop3d'));
   }
 
   loadScenario(scenarioId) {
@@ -551,6 +704,7 @@ class PlantSimulationApp {
           this.pidView.setSelection(id, this.showConnectionsOnly);
           this.pidView.render(this.sim);
         }
+        this.syncHP01Toolbar();
         this.renderInspectorCard();
         this.renderConsumersTable();
       });
@@ -610,6 +764,7 @@ class PlantSimulationApp {
             this.pidView.setSelection(compId, this.showConnectionsOnly);
             this.pidView.render(this.sim);
           }
+          this.syncHP01Toolbar();
           this.renderInspectorCard();
         }
       });
@@ -619,6 +774,10 @@ class PlantSimulationApp {
   renderInspectorCard() {
     const cardEl = document.getElementById('side-inspector-card');
     if (!cardEl) return;
+    if (this.isHP01CutawayView() && this.hp01Controller) {
+      this.renderHP01CutawayCard(cardEl);
+      return;
+    }
     const compId = this.selectedComponentId || 'HP01';
     const comp = COMPONENT_REGISTRY[compId];
     if (!comp) return;
@@ -1013,8 +1172,11 @@ class PlantSimulationApp {
       const dtReal = this.stepFrameByWallDt((now - lastTime) / 1000);
       lastTime = now;
 
+      this.hp01InFrame = true;
       if (this.viewMode !== 'pid' && this.scene3d) {
-        this.scene3d.updateAndRender(this.sim, dtReal);
+        const hp01VM = this.buildHP01FrameViewModel();
+        this.scene3d.updateAndRender(this.sim, dtReal, { hp01VM });
+        this.syncHP01AnimationStatus(hp01VM);
       }
 
       uiTimer += dtReal;
@@ -1031,6 +1193,7 @@ class PlantSimulationApp {
         }
       }
 
+      this.hp01InFrame = false;
       requestAnimationFrame(frame);
     };
 

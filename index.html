@@ -16,7 +16,7 @@
 <body>
 <nav aria-label="ניווט בתצוגה הציבורית" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:12px;background:#142337;color:#fff;font:600 15px Arial;line-height:1.6">
 <a style="color:#fff" href="./index.html">המערכת — 5 מחליפי חום</a>
-<a style="color:#7dd3fc" href="./cutaway.html">חתך HP01 — תצוגה מקדימה</a>
+<a style="color:#7dd3fc" href="./index.html?view=cutaway3d">חתך HP01 — הנפשת תהליכים</a>
 <a style="color:#fde68a" href="./review.html">מידע למהנדס ומגבלות המודל</a>
 <a style="color:#cbd5e1" href="https://github.com/kopcaptz/hp-rtxc-5hx">קוד המקור</a>
 </nav>
@@ -132,6 +132,34 @@
         </div>
       </div>
 
+      <!-- Package C: HP01 cutaway controls (visible only in the HP01 cutaway; one list for all 25 nodes) -->
+      <div id="hp01-cutaway-toolbar" class="hp01-toolbar" hidden>
+        <div id="hp01-focus-strip" class="hp01-focus-strip" aria-live="polite">מיקוד: HP01 — סקירה</div>
+        <div class="hp01-toolbar-row">
+          <label for="hp01-node-select">רכיב:</label>
+          <select id="hp01-node-select" aria-label="בחירת רכיב מתוך 25 צמתי החתך"></select>
+          <label for="hp01-camera-select">מצלמה:</label>
+          <select id="hp01-camera-select" aria-label="בחירת זווית מצלמה"></select>
+          <label for="hp01-filter-select">מעגל:</label>
+          <select id="hp01-filter-select" aria-label="סינון מעגל">
+            <option value="both">שני המעגלים</option>
+            <option value="ckt1">מעגל 1</option>
+            <option value="ckt2">מעגל 2</option>
+            <option value="whex">מחליף ומים</option>
+          </select>
+          <label for="hp01-casing-select">מעטפת:</label>
+          <select id="hp01-casing-select" aria-label="מצב מעטפת">
+            <option value="ghost">שקופה</option>
+            <option value="full">מלאה</option>
+            <option value="hidden">מוסתרת</option>
+          </select>
+          <button id="hp01-btn-overview" class="btn">סקירת HP01</button>
+          <button id="hp01-btn-roof" class="btn">חזרה לגג</button>
+          <button id="hp01-btn-freeze" class="btn hp01-freeze-btn" type="button" aria-pressed="false" title="הקפאת התנועה בחתך בלבד — חישוב המודל ממשיך">הקפאת תנועה</button>
+        </div>
+        <div id="hp01-anim-status" class="hp01-anim-status" role="status" aria-live="polite"></div>
+      </div>
+
       <!-- 3D / P&ID Viewport Frame -->
       <div class="viewport-frame">
         <div id="viewport-3d" class="viewport-canvas-host"></div>
@@ -139,7 +167,7 @@
       </div>
 
       <!-- Stream & Temperature Color Legend (Section 12.1) -->
-      <div class="stream-legend-bar">
+      <div class="stream-legend-bar" id="stream-legend-bar">
         <div class="legend-item"><span class="legend-dot" style="background:#e0f2fe;border:1px solid #38bdf8;"></span> זרימת אוויר (סלילי אידוי + 12 מאווררי EC)</div>
         <div class="legend-item"><span class="legend-dot" style="background:#d946ef;"></span> קרר R513A (2 מעגלים + אקונומייזר BPHE; כחול בהפשקה)</div>
         <div class="legend-item"><span class="legend-dot" style="background:#38bdf8;"></span> מים קרירים (&lt;34°C)</div>

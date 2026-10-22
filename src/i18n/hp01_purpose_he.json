@@ -1,0 +1,530 @@
+{
+  "packageId": "HP01-PLAN01-PURPOSE-CORRECTION-R4",
+  "status": "EDITORIAL_EXPLANATION",
+  "statusHe": "הסבר עורך המוקאפ (EDITORIAL_EXPLANATION)",
+  "statusRu": "Пояснение автора макета. Составлено по существующим описаниям соединений, режимным состояниям арматуры и metadata; не является цитатой OEM и не помечается CONFIRMED_BY_DOC. Frozen metadata (src/**) не изменялись.",
+  "sourceKinds": {
+    "connection": "fixtures-registry.json → connectionCatalog.<id> (descriptionRu/descriptionHe, порты), построен из src/viz3d/hp01_cutaway_meta.mjs HP01_INTERNAL_CONNECTIONS",
+    "aux": "fixtures-registry.json → auxValvesCatalog.<id>.statesByMode (из HP01_AUX_VALVES)",
+    "meta": "src/viz3d/hp01_cutaway_meta.mjs → HP01_SUBNODES.<id>.<field>",
+    "fixture": "fixtures-registry.json → states.<state>.viewModel.<field>"
+  },
+  "entries": {
+    "COMP1": {
+      "purposeHe": "דוחס את אדי הקרר של מעגל 1 ומעלה את לחצם וטמפרטורתם, כדי שהקרר יוכל למסור חום בהמשך המעגל. יונק גז דרך שסתום ההיפוך 4WV1, מקבל הזרקת אדים מהאקונומייזר ECON1 ופולט גז חם למפריד השמן OS1.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-15"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-11"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-01"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "COMP2": {
+      "purposeHe": "דוחס את אדי הקרר של מעגל 2 ומעלה את לחצם וטמפרטורתם, כדי שהקרר יוכל למסור חום בהמשך המעגל. יונק גז דרך שסתום ההיפוך 4WV2, מקבל הזרקת אדים מהאקונומייזר ECON2 ופולט גז חם למפריד השמן OS2.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-15"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-11"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-01"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "WHEX": {
+      "purposeHe": "מעביר חום בין המים הראשיים שזורמים בצינורות לבין הקרר של שני המעגלים שבמעטפת, דרך דפנות הצינורות וללא ערבוב. בחימום הגז החם מתעבה בו ומחמם את המים; בהפשרה הכיוון מתהפך והקרר מתאדה בו ולוקח חום מהמים.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "W-01"
+        },
+        {
+          "kind": "connection",
+          "id": "W-02"
+        },
+        {
+          "kind": "connection",
+          "id": "W-03"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-03"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-04"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-05"
+        },
+        {
+          "kind": "fixture",
+          "id": "states.invalid_cycle_defrost.viewModel.unit.qWater (Q_water < 0)"
+        }
+      ],
+      "allowedNumbers": []
+    },
+    "ECON1": {
+      "purposeHe": "מקרר-יתר את הנוזל הראשי של מעגל 1 בדרכו לשסתומי ההתפשטות: חלק מהנוזל מותז דרך EXV-ECON1, מתאדה ונשלח כאדים להזרקת ביניים במדחס COMP1. הצומת כולל גם את גשר הנוזל החד-כיווני עם המסנן FILT1; ענף ההזרקה פועל בחימום לפי מצב האקונומייזר וסגור בהפשרה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-08"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-09"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-10"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-11"
+        },
+        {
+          "kind": "aux",
+          "id": "EXV-ECON1"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "ECON2": {
+      "purposeHe": "מקרר-יתר את הנוזל הראשי של מעגל 2 בדרכו לשסתומי ההתפשטות: חלק מהנוזל מותז דרך EXV-ECON2, מתאדה ונשלח כאדים להזרקת ביניים במדחס COMP2. הצומת כולל גם את גשר הנוזל החד-כיווני עם המסנן FILT2; ענף ההזרקה פועל בחימום לפי מצב האקונומייזר וסגור בהפשרה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-08"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-09"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-10"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-11"
+        },
+        {
+          "kind": "aux",
+          "id": "EXV-ECON2"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "REC1": {
+      "purposeHe": "מכל צדדי לאגירת קרר נוזלי של מעגל 1, מחוץ למסלול הנוזל הראשי. בחימום ענפי המילוי והפריקה שלו סגורים; בהפשרה הוא נפרק מתחתיתו אל WHEX. הענף מכיפת המכל (C1-07b) אינו מתועד בטבלת המצבים ולכן מוצג כגאומטריה בלבד.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-06"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-07"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-07b"
+        },
+        {
+          "kind": "aux",
+          "id": "SOL-REC-OUT1"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "REC2": {
+      "purposeHe": "מכל צדדי לאגירת קרר נוזלי של מעגל 2, מחוץ למסלול הנוזל הראשי. בחימום ענפי המילוי והפריקה שלו סגורים; בהפשרה הוא נפרק מתחתיתו אל WHEX. הענף מכיפת המכל (C2-07b) אינו מתועד בטבלת המצבים ולכן מוצג כגאומטריה בלבד.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-06"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-07"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-07b"
+        },
+        {
+          "kind": "aux",
+          "id": "SOL-REC-OUT2"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "EXV-C1": {
+      "purposeHe": "מוריד את לחץ הקרר הנוזלי של מעגל 1 ומזין אותו למפזר הקרר שבתוך WHEX. סגור בחימום; פתוח בהפשרה, כאשר WHEX משמש מאייד.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-05"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "EXV-C2": {
+      "purposeHe": "מוריד את לחץ הקרר הנוזלי של מעגל 2 ומזין אותו למפזר הקרר שבתוך WHEX. סגור בחימום; פתוח בהפשרה, כאשר WHEX משמש מאייד.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-05"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "EXV-H1": {
+      "purposeHe": "מוריד את לחץ הקרר הנוזלי של מעגל 1 ומזין אותו לתחתית סוללת האוויר ACOIL1. פתוח בחימום, כאשר הסוללה משמשת מאייד שקולט חום מהאוויר החיצוני; סגור בהפשרה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-12"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "EXV-H2": {
+      "purposeHe": "מוריד את לחץ הקרר הנוזלי של מעגל 2 ומזין אותו לתחתית סוללת האוויר ACOIL2. פתוח בחימום, כאשר הסוללה משמשת מאייד שקולט חום מהאוויר החיצוני; סגור בהפשרה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-12"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "ACOIL1": {
+      "purposeHe": "מחליף חום בין האוויר החיצוני לקרר של מעגל 1. בחימום הקרר מתאדה בו וקולט חום מהאוויר שמאווררי FAN-GRP1 מזרימים דרכו; בהפשרה מוזרם אליו גז חם להמסת הכפור, והנוזל יוצא דרך אל-החוזר CV-ACOIL1.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-12"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-14"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-13"
+        },
+        {
+          "kind": "connection",
+          "id": "A-01"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "ACOIL2": {
+      "purposeHe": "מחליף חום בין האוויר החיצוני לקרר של מעגל 2. בחימום הקרר מתאדה בו וקולט חום מהאוויר שמאווררי FAN-GRP2 מזרימים דרכו; בהפשרה מוזרם אליו גז חם להמסת הכפור, והנוזל יוצא דרך אל-החוזר CV-ACOIL2.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-12"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-14"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-13"
+        },
+        {
+          "kind": "connection",
+          "id": "A-02"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "4WV1": {
+      "purposeHe": "קובע לאן יזרום הגז החם של מעגל 1: בחימום אל WHEX ובהפשרה אל סוללת האוויר ACOIL1. בשני המצבים הוא מחזיר את גז היניקה אל המדחס COMP1.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-02"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-03"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-14"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-15"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "4WV2": {
+      "purposeHe": "קובע לאן יזרום הגז החם של מעגל 2: בחימום אל WHEX ובהפשרה אל סוללת האוויר ACOIL2. בשני המצבים הוא מחזיר את גז היניקה אל המדחס COMP2.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-02"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-03"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-14"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-15"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "OS1": {
+      "purposeHe": "מפריד את שמן הסיכה מהגז החם שיוצא מהמדחס COMP1. הגז ממשיך לשסתום ההיפוך 4WV1, והשמן חוזר למדחס דרך מערכת השמן של מעגל 1.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-01"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-02"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-16"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "OS2": {
+      "purposeHe": "מפריד את שמן הסיכה מהגז החם שיוצא מהמדחס COMP2. הגז ממשיך לשסתום ההיפוך 4WV2, והשמן חוזר למדחס דרך מערכת השמן של מעגל 2.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-01"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-02"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-16"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "FAN-GRP1": {
+      "purposeHe": "מזרימים אוויר חיצוני דרך סוללת האוויר ACOIL1 ופולטים אותו כלפי מעלה, כדי שתתאפשר העברת חום בין האוויר לקרר של מעגל 1. בהפשרה הם מופסקים.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "A-01"
+        },
+        {
+          "kind": "meta",
+          "id": "HP01_SUBNODES.FAN-GRP1.sourceRef (p. 49: 0% in Defrost)"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "FAN-GRP2": {
+      "purposeHe": "מזרימים אוויר חיצוני דרך סוללת האוויר ACOIL2 ופולטים אותו כלפי מעלה, כדי שתתאפשר העברת חום בין האוויר לקרר של מעגל 2. בהפשרה הם מופסקים; ההזנה החשמלית מגיעה מארון הבקרה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "A-02"
+        },
+        {
+          "kind": "connection",
+          "id": "E-01"
+        },
+        {
+          "kind": "meta",
+          "id": "HP01_SUBNODES.FAN-GRP2.sourceRef (p. 49: 0% in Defrost)"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "OIL-CKT1": {
+      "purposeHe": "מקררת, מסננת ומזרימה את שמן הסיכה ממפריד השמן OS1 אל המדחס COMP1. את מקרר השמן מקרר ענף קרר דרך TXV-OIL1; בהפשרה נפתח גם קו החזרת שמן מ-WHEX דרך SOL-OIL1.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C1-16"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-17"
+        },
+        {
+          "kind": "connection",
+          "id": "C1-18"
+        },
+        {
+          "kind": "aux",
+          "id": "SOL-OIL1"
+        }
+      ],
+      "allowedNumbers": [
+        "1"
+      ]
+    },
+    "OIL-CKT2": {
+      "purposeHe": "מקררת, מסננת ומזרימה את שמן הסיכה ממפריד השמן OS2 אל המדחס COMP2. את מקרר השמן מקרר ענף קרר דרך TXV-OIL2; בהפשרה נפתח גם קו החזרת שמן מ-WHEX דרך SOL-OIL2.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "C2-16"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-17"
+        },
+        {
+          "kind": "connection",
+          "id": "C2-18"
+        },
+        {
+          "kind": "aux",
+          "id": "SOL-OIL2"
+        }
+      ],
+      "allowedNumbers": [
+        "2"
+      ]
+    },
+    "FS-HP01": {
+      "purposeHe": "מאשר לבקר שיש זרימת מים ראשית ביציאה מ-WHEX. אם המגע נפתח למשך זמן ההשהיה, הבקר נועל את היחידה ועוצר את המדחסים כדי להגן על המחליף. זהו מגע זרימה, לא מד ספיקה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "W-03"
+        },
+        {
+          "kind": "connection",
+          "id": "E-03"
+        },
+        {
+          "kind": "fixture",
+          "id": "states.forced_fs_open.twoStageFsDelay (HEATING לפני ההשהיה, STEP_11_FAULT_LOCKOUT אחריה)"
+        }
+      ],
+      "allowedNumbers": []
+    },
+    "DRAIN-SYS": {
+      "purposeHe": "אוסף את מי העיבוי וההפשרה ממגשי סוללות האוויר ומאפשר לרוקן את קופסאות המים של WHEX לשירות. במודל זו גאומטריה סטטית; ספיקת הניקוז אינה ידועה.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "W-04"
+        },
+        {
+          "kind": "meta",
+          "id": "HP01_SUBNODES.DRAIN-SYS.sourceRef (drain flow rate MISSING_DATA)"
+        }
+      ],
+      "allowedNumbers": []
+    },
+    "CTRL-SYMBIO": {
+      "purposeHe": "ארון ההזנה והבקרה של היחידה: מזין חשמל למדחסים דרך וסתי התדר ולמאווררים, ומנהל את שלבי ההפעלה וההגנה, כולל אינטרלוק עם מפסק הזרימה FS-HP01. מעביר גם הזנה נפרדת לגופי החימום נגד קיפאון של WHEX ומתקשר עם מערכת BMS חיצונית.",
+      "sources": [
+        {
+          "kind": "connection",
+          "id": "E-01"
+        },
+        {
+          "kind": "connection",
+          "id": "E-02"
+        },
+        {
+          "kind": "connection",
+          "id": "E-03"
+        },
+        {
+          "kind": "connection",
+          "id": "E-04"
+        }
+      ],
+      "allowedNumbers": []
+    },
+    "FRAME-BASE": {
+      "purposeHe": "שלדת הפלדה שנושאת את כל רכיבי היחידה ומעבירה את משקלה לגג דרך 8 מבודדי רעידות W1..W8. כוללת את נקודות ההרמה A..H להתקנה.",
+      "sources": [
+        {
+          "kind": "meta",
+          "id": "HP01_SUBNODES.FRAME-BASE.supportType (SUPPORTED_BY_8_NEOPRENE_ISOLATORS_W1_W8)"
+        },
+        {
+          "kind": "meta",
+          "id": "HP01_SUBNODES.FRAME-BASE.titleHe (8 אוזני הרמה A..H)"
+        }
+      ],
+      "allowedNumbers": [
+        "8"
+      ]
+    }
+  }
+}

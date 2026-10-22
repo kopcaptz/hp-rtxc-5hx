@@ -207,13 +207,30 @@ export const HP01_CUTAWAY_TEXT_HE = {
   },
 
   identityNotes: {
-    equipmentSchemaRoleHe: 'מזהה רכיב בסכמת המתקן שלנו (HP01) — אינו מספר סידורי של היצרן',
-    shortModelConfirmedHe: 'דגם אב-טיפוס מתועד ממשפחת RTXC (עמ׳ 16–17, עמודה 180 — CONFIRMED_BY_DOC)',
+    equipmentSchemaRoleHe: 'מזהה רכיב בסכמת המתקן שלנו (HP01) — אינו מספר סידורי של היצרן (CONFIRMED_PROJECT_SCHEMA_ID)',
+    equipmentTagAssumedHe: 'מזהה רכיב (הנחה לדמו) — אינו מספר סידורי של היצרן (ASSUMED_FOR_DEMO)',
+    equipmentTagUnverifiedHe: 'מזהה רכיב (לא ידוע / חסר) — חסר מקור או סטטוס תוקף; אינו מספר סידורי של היצרן (UNKNOWN_OR_MISSING)',
+    shortModelConfirmedHe: 'דגם אב-טיפוס מאומת במסמך OEM ממשפחת RTXC (עמ׳ 16–17, עמודה 180 — CONFIRMED_BY_DOC)',
+    shortModelConfirmedGenericHe: 'שם דגם מאומת במסמך OEM (CONFIRMED_BY_DOC)',
+    shortModelAssumedHe: 'שם דגם להדגמה בלבד (הנחה לדמו) — אינו מאומת בתיעוד יצרן (ASSUMED_FOR_DEMO)',
+    shortModelClarificationHe: 'שם דגם — נדרש בירור הנדסי (REQUIRES_CLARIFICATION)',
+    shortModelFromSiteHe: 'שם דגם — נתון אתר ללא אימות בתיעוד יצרן (FROM_SITE)',
+    shortModelUnverifiedHe: 'שם דגם (לא ידוע / חסר) — חסר מקור או סטטוס תוקף (UNKNOWN_OR_MISSING)',
     configCodeAssumedHe:
-      'קוד תצורה מורכב של אב-טיפוס להדגמה (28 תווים לפי עמ׳ 8) — אינו הזמנת מפעל מאומתת מהאתר (ASSUMED_FOR_DEMO)',
-    missingEquipmentIdHe: '— (אין נתון מזהה רכיב)',
-    missingShortModelNameHe: '— (אין נתון שם דגם)',
-    missingConfigCodeHe: '— (אין נתון קוד תצורה)'
+      'קוד תצורה מורכב של אב-טיפוס להדגמה (28 תווים לפי עמ׳ 8, הנחה לדמו) — אינו הזמנת מפעל מאומתת מהאתר (ASSUMED_FOR_DEMO)',
+    configCodeConfirmedGenericHe:
+      'קוד תצורה מתועד — אינו הזמנת מפעל מאומתת מהאתר (CONFIRMED_BY_DOC)',
+    configCodeAssumedGenericHe:
+      'קוד תצורה להדגמה בלבד (הנחה לדמו) — אינו הזמנת מפעל מאומתת מהאתר (ASSUMED_FOR_DEMO)',
+    configCodeClarificationHe:
+      'קוד תצורה — נדרש בירור הנדסי; אינו הזמנת מפעל מאומתת מהאתר (REQUIRES_CLARIFICATION)',
+    configCodeFromSiteHe:
+      'קוד תצורה — נתון אתר ללא אימות דרכון; אינו הזמנת מפעל מאומתת מהאתר (FROM_SITE)',
+    configCodeUnverifiedHe:
+      'קוד תצורה (לא ידוע / חסר) — חסר מקור או סטטוס תוקף; אינו הזמנת מפעל מאומתת מהאתר (UNKNOWN_OR_MISSING)',
+    missingEquipmentIdHe: '— (אין נתון מזהה רכיב — לא ידוע / חסר — UNKNOWN_OR_MISSING)',
+    missingShortModelNameHe: '— (אין נתון שם דגם — לא ידוע / חסר — UNKNOWN_OR_MISSING)',
+    missingConfigCodeHe: '— (אין נתון קוד תצורה — לא ידוע / חסר — UNKNOWN_OR_MISSING)'
   },
 
   refrigerantChargeNotes: {
@@ -221,7 +238,9 @@ export const HP01_CUTAWAY_TEXT_HE = {
     perCircuitAssumedHe:
       'הערכת חלוקה שווה: ≈152 ק״ג למעגל 1 + ≈152 ק״ג למעגל 2 = 304 ק״ג (ASSUMED_FOR_DEMO — בטבלה 2 עמ׳ 16 מופיע סך 304 ק״ג בלבד; בדרכון הקפוא סווגו 152 ק״ג כנתון מתועד אך בשכבת החתך הם מוצגים במפורש כהנחת חלוקה שווה)',
     frozenPrototypeClassificationNoteHe:
-      'בדרכון הקפוא (rtxc_prototype.mjs) סווג refrigerantChargePerCircuitKg=152 כ-confirmed_by_doc, אך בטבלה 2 עמ׳ 16 מופיע רק הסכום הכולל 304 ק״ג; לכן בשכבת החתך התלת-ממדי מוצג 152 ק״ג למעגל במפורש כ-ASSUMED_FOR_DEMO'
+      'בדרכון הקפוא (rtxc_prototype.mjs) סווגו השדות refrigerantChargeCkt1=152 ו-refrigerantChargeCkt2=152 כ-confirmed_by_doc, אך בטבלה 2 עמ׳ 16 מופיע רק הסכום הכולל 304 ק״ג; לכן בשכבת החתך התלת-ממדי מוצג 152 ק״ג למעגל במפורש כ-ASSUMED_FOR_DEMO',
+    frozenPrototypeMissingNoteHe:
+      'שדות הקרר למעגל (refrigerantChargeCkt1 / refrigerantChargeCkt2) חסרים או ללא סטטוס בדרכון שהועבר (UNKNOWN_OR_MISSING); בשכבת החתך מוצגת הערכת חלוקה 152+152 ק״ג כ-ASSUMED_FOR_DEMO בלבד'
   },
 
   localInspectionModeBannerHe:
